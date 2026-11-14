@@ -2,15 +2,25 @@ import os
 import secrets
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 import psycopg
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from db import load_catalog
+
 AUTHORIZATION = f"Bearer {os.environ['AIRLINE_API_KEY']}".encode()
 BOOT_ID = str(uuid.uuid4())
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+@asynccontextmanager
+async def lifespan(app):
+    load_catalog()
+    yield
+
+
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @app.middleware("http")
