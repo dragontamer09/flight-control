@@ -44,5 +44,25 @@ container if its process exits. The `airline_data` volume survives
   concurrently. PostgreSQL adds a separate process and connection management.
   Compose handles startup and gives the database a persistent volume.
 
-The scaffold provides an authenticated health check. The flight catalog,
-booking endpoints, and `POST /admin/restart` are tracked separately.
+The service provides an authenticated health check and loads the flight catalog.
+Booking endpoints and `POST /admin/restart` are tracked separately.
+
+## Shared API behavior
+
+Every request requires the configured bearer key. Errors use string `error`
+and `detail` fields, including validation errors (`422`), unknown routes (`404`),
+and unexpected failures (`500`). Unexpected failures are logged on the server;
+their details are not returned to clients. Every response includes
+`Server-Timing: app;dur=<milliseconds>`. There is no rate limiter.
+
+Body models must inherit `RequestModel` from `app.py` so wrong JSON types are
+rejected rather than coerced (for example, `"2"` is not an integer).
+Endpoint-specific bounds and connection rules belong in their respective models
+and handlers. Query parameters arrive as text and need their own validation.
+For future endpoint responses, use UTC timestamps ending in `Z`, dates in
+`YYYY-MM-DD` form, and integer cents for money.
+
+Run the shared API regression check from the repository root with
+`python -m pytest tests/test_airline_api.py` in an environment containing
+`airline/requirements.txt`, `httpx`, and `pytest`. It uses test-only routes and
+does not require PostgreSQL or catalog loading.
