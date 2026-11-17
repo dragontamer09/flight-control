@@ -27,6 +27,13 @@ services:
       retries: 15
     volumes:
       - airline_data:/var/lib/postgresql/data
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.2
+    command: tunnel --no-autoupdate --url http://app:8080
+    profiles: [tunnel]
+    depends_on:
+      - app
+    restart: unless-stopped
 
 volumes:
   airline_data:

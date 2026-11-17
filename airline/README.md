@@ -80,10 +80,31 @@ docker compose up -d --build
 `docker compose down -v` deletes the `airline_data` volume. Use plain
 `docker compose down` to stop the stack and keep the data.
 
-## Expose the airline publicly
+## Public URL (optional)
 
-TODO: Choose a tunnel provider and write the steps to expose the API. Set
-`AIRLINE_API_KEY` to your own key before you open a tunnel.
+Plain `docker compose up` keeps the airline local only. To make it reachable
+over the internet, use the `tunnel` profile. It runs a Cloudflare quick tunnel.
+
+1. Set your own `AIRLINE_API_KEY` in `airline/.env` first.
+2. Start the airline with the tunnel:
+
+   ```sh
+   docker compose --profile tunnel up -d
+   ```
+
+3. Find the public URL. It has the form `https://<random>.trycloudflare.com`:
+
+   ```sh
+   docker compose logs tunnel
+   ```
+
+4. Submit that URL on the team page of the class site. The instructor must
+   approve the exact URL. The class site only accepts `https` hosts under
+   `trycloudflare.com`.
+
+The URL changes every time the tunnel container is recreated. Submit the new
+URL after a recreate. Keep the tunnel running during the restart test. Stop it
+with `docker compose --profile tunnel down`.
 
 ## Configuration
 
