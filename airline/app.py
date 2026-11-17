@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from db import load_catalog
+from search import load_search_catalog, router as search_router
 
 AUTHORIZATION = f"Bearer {os.environ['AIRLINE_API_KEY']}".encode()
 BOOT_ID = str(uuid.uuid4())
@@ -17,10 +18,12 @@ BOOT_ID = str(uuid.uuid4())
 @asynccontextmanager
 async def lifespan(app):
     load_catalog()
+    load_search_catalog()
     yield
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(search_router)
 
 
 @app.middleware("http")

@@ -32,8 +32,9 @@ CREATE INDEX IF NOT EXISTS flights_origin_date
 
 
 def copy_csv(connection, table, path):
+    columns = '(flight_id, flight_number, origin, destination, scheduled_departure, scheduled_arrival, origin_local_date, capacity, base_fare_cents, distance_mi)' if table == 'flights' else ''
     with connection.cursor() as cursor:
-        with cursor.copy(f"COPY {table} FROM STDIN WITH (FORMAT csv, HEADER true)") as copy:
+        with cursor.copy(f"COPY {table} {columns} FROM STDIN WITH (FORMAT csv, HEADER true)") as copy:
             with path.open("rb") as source:
                 while chunk := source.read(1 << 20):
                     copy.write(chunk)
@@ -44,6 +45,22 @@ def load_catalog():
     with psycopg.connect() as connection:
         connection.execute("SELECT pg_advisory_xact_lock(%s)", (LOAD_LOCK_ID,))
         connection.execute(SCHEMA)
+        # Temporary search compatibility schema; replace with T1's schema on merge.
+        connection.execute("""
+            ALTER TABLE flights ADD COLUMN IF NOT EXISTS seats_sold integer NOT NULL DEFAULT 0;
+            CREATE TABLE IF NOT EXISTS holds (
+                hold_id text PRIMARY KEY, itinerary_id text NOT NULL, passengers integer NOT NULL,
+                price_cents integer NOT NULL, total_cents integer NOT NULL,
+                expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+                consumed boolean NOT NULL DEFAULT false
+            );
+            CREATE TABLE IF NOT EXISTS hold_legs (
+                hold_id text NOT NULL REFERENCES holds (hold_id),
+                flight_id text NOT NULL REFERENCES flights (flight_id), seats integer NOT NULL,
+                PRIMARY KEY (hold_id, flight_id)
+            );
+            CREATE INDEX IF NOT EXISTS hold_legs_flight ON hold_legs (flight_id);
+        """)
         if connection.execute("SELECT EXISTS (SELECT 1 FROM flights)").fetchone()[0]:
             return
         copy_csv(connection, "airports", CATALOG_DIR / "airports.csv")
