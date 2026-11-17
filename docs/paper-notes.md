@@ -6,7 +6,7 @@ These notes support writing the 3-page check-in paper for GitHub issue #21.
 
 - **Language and runtime**: Python 3.12 running under Docker (`airline/Dockerfile:1`, base image `python:3.12-slim`). Python matches the Flight Control grader ecosystem, enables rapid iteration, and provides native library support for FastAPI and Psycopg.
 - **Web framework**: FastAPI with Uvicorn ASGI server (`airline/Dockerfile:9`, `airline/app.py:27`). FastAPI provides automated request schema validation via Pydantic (`airline/seats.py:22-35`), native JSON serialization, clean dependency injection, and standardized HTTP error status code generation.
-- **Database and driver**: PostgreSQL 17 (`airline/compose.yaml:18`) with Psycopg 3 (`psycopg` 3.2.1) and Psycopg Pool (`psycopg_pool` 3.2.1) (`airline/requirements.txt:1-4`, `airline/db.py:9`). PostgreSQL provides ACID transactions, explicit row-level locking (`SELECT ... FOR UPDATE`), partial indexes, and durable write-ahead logging (WAL).
+- **Database and driver**: PostgreSQL 17 (`airline/compose.yaml:18`) with Psycopg 3 (`psycopg[binary]` 3.3.6) and Psycopg Pool (`psycopg-pool` 3.3.3) (`airline/requirements.txt:1-4`, `airline/db.py:9`). PostgreSQL provides ACID transactions, explicit row-level locking (`SELECT ... FOR UPDATE`), partial indexes, and durable write-ahead logging (WAL).
 - **Connection pooling**: A single shared `ConnectionPool` with `min_size=4`, `max_size=32`, `timeout=5`, and `kwargs={"row_factory": dict_row}` manages database connections across all application modules (`airline/db.py:9`). The pool is opened and closed within the FastAPI lifespan context manager (`airline/app.py:20-25`).
 - **Database schema (tables and purposes)**:
   - `airports` (`airline/db.py:12-19`): Stores static airport metadata including `code` (PK, text), `city` (text), `lat` (double precision), `lon` (double precision), `tz` (text), and `hub` (boolean). Loaded once from `catalog/airports.csv` via PostgreSQL `COPY` (`airline/db.py:77-88`).
@@ -26,7 +26,7 @@ These notes support writing the 3-page check-in paper for GitHub issue #21.
   - `airline/compose.yaml`: Multi-container definitions for `app`, `db` (Postgres 17 with healthcheck), and opt-in Cloudflare `tunnel`.
 - **Rejected alternatives**:
   - *Counter columns with background expiration sweeper*: Rejected maintaining a `seats_held` column on `flights` decremented by an asynchronous sweeper worker. A background sweeper adds an independent moving part that can fail, lag under high load, or leak held seat counts across server restarts and process crashes. Instead, live hold seats are derived on demand from `holds` where `NOT consumed AND expires_at > clock_timestamp()`.
-  - *In-memory seat state / cache*: Rejected storing holds and booking state in memory (like the toy airline) or external cache (Redis). In-memory state cannot survive process restart tests, breaks multi-worker scaling, and risks split-brain or double-allocation under crash scenarios.
+  - *In-memory seat state / cache*: NOT discussed during the build. If you want it in the paper, the argument is that in-memory state (as in the toy airline) would not survive test 4's process kill.
   - *Opening a fresh database connection per request*: Initial search implementation established a new connection via `psycopg.connect()` on every incoming request. Burst testing revealed high connection latency (p95 259 ms under 40 clients). Replaced with a shared `psycopg_pool.ConnectionPool`.
 
 ## 2. What broke during the build and how it was fixed
@@ -38,16 +38,16 @@ These notes support writing the 3-page check-in paper for GitHub issue #21.
   - *Evidence after*: Test 1 showed 118 of 118 travelers correct (later confirmed at 120 of 120 in final run `2a8bd5f`).
 - **Search connection latency bottleneck**:
   - *Symptom with numbers*: Under burst testing with 40 concurrent clients, search p95 latency reached 259 ms.
-  - *Root cause*: `airline/search.py` opened a fresh TCP and TLS/authentication connection to PostgreSQL via `psycopg.connect()` on every search request instead of utilizing pooled connections.
+  - *Root cause*: `airline/search.py` opened a fresh TCP connection and authenticated to PostgreSQL via `psycopg.connect()` on every search request instead of utilizing pooled connections.
   - *Fix (commit d541678)*: Merged `search.py` into the shared `db.pool` connection pool, acquiring connections using `with pool.connection() as connection:`.
-  - *Evidence after*: In test 2 (Rush profile at 40 travelers/s), search p95 server time dropped to 4.5 ms, hold p95 was 6.6 ms, booking p95 was 6.5 ms, and overall summed server time p95 reached 14.0 ms (down from 15.6 ms initially), well below the 500 ms contract ceiling.
+  - *Evidence after*: In test 2 (Rush profile at 40 travelers/s), search p95 server time dropped to 4.5 ms, hold p95 was 6.6 ms, booking p95 was 6.5 ms, and summed server time p95 at 40 travelers/s was 14.0 ms (15.6 ms on an earlier run of the same code), well below the 500 ms contract ceiling. Test 2 was never run before the fix, so there is no grader before/after pair; the only "before" number is the 259 ms burst measurement.
 - **Docker build missing Python modules**:
   - *Symptom with numbers*: Container exited immediately on boot with `ModuleNotFoundError: No module named 'errors'`.
   - *Root cause*: `airline/Dockerfile` contained `COPY app.py db.py ./`, and `airline/.dockerignore` excluded all other Python files by default with `*` and explicit whitelists. When modular code `errors.py` and `seats.py` were added in commit `0491640`, they were omitted from the build image.
   - *Fix (commit 0491640)*: Updated `airline/Dockerfile` to `COPY *.py ./` and modified `airline/.dockerignore` with `!*.py`.
   - *Evidence after*: Container built cleanly and started FastAPI application without import failures.
 - **Docker instant restart during restart test**:
-  - *Symptom with numbers*: Flight Control grader test 4 failed because Docker restart policy `restart: unless-stopped` relaunched the app container in approximately 100 ms. Grader requires the server to be observed down for approximately 30 seconds.
+  - *Symptom with numbers*: Found during design, before test 4 ever ran (`airline/NOTES-t3-admin.md`): Docker restart policy `restart: unless-stopped` relaunches the app container in about 100 ms. The contract expects the server to be down for about 30 seconds and the grader must see it down at least once.
   - *Root cause*: A bare `os._exit(1)` caused Docker to restart the service almost immediately; the grader polling `/health` every 1 second failed to witness the service down.
   - *Fix (commit 48fa428)*: In `airline/admin.py:18-32,84-93`, `die()` records the current timestamp to `/tmp/restart-at` on the container filesystem before invoking `os._exit(1)` after 0.3 s. Upon relaunch, `wait_out_restart_downtime()` reads the timestamp and executes `time.sleep()` until 30 seconds have elapsed from exit time, before binding the HTTP port.
   - *Evidence after*: Grader observed 30.4 s of downtime, verified server recovery at 31.7 s with a fresh `boot_id`, and scored 1.00 on test 4 with 394 of 394 recovery travelers correct.
