@@ -5,3 +5,6 @@
 !*.py
 !catalog
 !requirements.txt
+
+!static
+!static/**
