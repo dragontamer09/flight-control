@@ -8,6 +8,7 @@ import psycopg
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+from admin import router as admin_router
 from db import load_catalog, pool
 from errors import install_error_handlers
 from search import load_search_catalog, router as search_router
@@ -30,6 +31,7 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 install_error_handlers(app)
 app.include_router(search_router)
 app.include_router(seats_router)
+app.include_router(admin_router)
 
 
 @app.middleware("http")
