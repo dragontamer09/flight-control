@@ -5,7 +5,6 @@ from datetime import timezone
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, StrictStr, conint
 
@@ -83,7 +82,6 @@ def create_hold(request: HoldRequest):
         raise ApiError(422, "invalid_itinerary", "a flight appears twice")
     hold_id = "h_" + secrets.token_hex(8)
     with pool.connection() as connection:
-        connection.row_factory = dict_row
         with connection.transaction():
             found = {row["flight_id"]: row for row in lock_flights(connection, flight_ids)}
             missing = [f for f in flight_ids if f not in found]
@@ -141,7 +139,6 @@ def body_hash(request: BookingRequest):
 def create_booking(request: BookingRequest):
     digest = body_hash(request)
     with pool.connection() as connection:
-        connection.row_factory = dict_row
         with connection.transaction():
             # Insert first: a concurrent copy of this key blocks on the unique index until
             # this transaction commits, then reads the stored answer.
@@ -211,7 +208,6 @@ def place_booking(connection, request):
 @router.get("/bookings/{booking_id}")
 def get_booking(booking_id: str):
     with pool.connection() as connection:
-        connection.row_factory = dict_row
         row = connection.execute(
             "SELECT * FROM bookings WHERE booking_id = %s", (booking_id,)
         ).fetchone()
@@ -223,7 +219,6 @@ def get_booking(booking_id: str):
 @router.delete("/bookings/{booking_id}")
 def cancel_booking(booking_id: str):
     with pool.connection() as connection:
-        connection.row_factory = dict_row
         with connection.transaction():
             row = connection.execute(
                 "SELECT * FROM bookings WHERE booking_id = %s FOR UPDATE", (booking_id,)

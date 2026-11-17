@@ -1,13 +1,14 @@
 from pathlib import Path
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 CATALOG_DIR = Path(__file__).parent / "catalog"
 LOAD_LOCK_ID = 4340
 
 # Opened by the app lifespan; every module takes connections from here.
-pool = ConnectionPool(min_size=4, max_size=32, timeout=5, open=False)
+pool = ConnectionPool(min_size=4, max_size=32, timeout=5, open=False, kwargs={"row_factory": dict_row})
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS airports (

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from db import load_catalog, pool
 from errors import install_error_handlers
+from search import load_search_catalog, router as search_router
 from seats import router as seats_router
 
 AUTHORIZATION = f"Bearer {os.environ['AIRLINE_API_KEY']}".encode()
@@ -19,6 +20,7 @@ BOOT_ID = str(uuid.uuid4())
 @asynccontextmanager
 async def lifespan(app):
     load_catalog()
+    load_search_catalog()
     pool.open()
     yield
     pool.close()
@@ -26,6 +28,7 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 install_error_handlers(app)
+app.include_router(search_router)
 app.include_router(seats_router)
 
 
