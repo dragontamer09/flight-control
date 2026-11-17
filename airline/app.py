@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 import psycopg
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from db import load_catalog, pool
 from errors import install_error_handlers
@@ -36,7 +36,7 @@ app.include_router(seats_router)
 async def authenticate(request: Request, call_next):
     started = time.perf_counter()
     authorization = request.headers.get("authorization", "").encode("latin-1")
-    if secrets.compare_digest(authorization, AUTHORIZATION):
+    if (request.method == "GET" and request.url.path == "/ui") or secrets.compare_digest(authorization, AUTHORIZATION):
         response = await call_next(request)
     else:
         response = JSONResponse({"error": "unauthorized", "detail": ""}, status_code=401)
@@ -52,3 +52,8 @@ def health():
     except psycopg.OperationalError:
         return JSONResponse({"error": "database_unavailable", "detail": ""}, status_code=503)
     return {"status": "ok", "boot_id": BOOT_ID, "version": "0.1.0"}
+
+
+@app.get("/ui")
+def ui():
+    return FileResponse("static/index.html")
