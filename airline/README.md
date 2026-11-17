@@ -20,7 +20,8 @@ docker compose up -d --build
 This builds the API, starts PostgreSQL 17, and starts the API. Compose waits
 for PostgreSQL before it starts the API. No other step is needed.
 
-Check that the API is up:
+Check that the API is up. Replace `8080` with your `AIRLINE_PORT` if you changed
+it. The check fails with a 503 when the API cannot reach PostgreSQL.
 
 ```sh
 curl -fsS -H 'Authorization: Bearer local-airline-key' http://localhost:8080/health
@@ -62,7 +63,8 @@ change that.
 
 ## Reset data
 
-Delete all bookings and holds, and keep the flights:
+Delete all bookings and holds, and keep the flights. Replace `8080` with your
+`AIRLINE_PORT` if you changed it:
 
 ```sh
 curl -fsS -X POST -H 'Authorization: Bearer local-airline-key' http://localhost:8080/admin/reset
