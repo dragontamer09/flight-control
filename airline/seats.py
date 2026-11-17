@@ -177,7 +177,9 @@ def place_booking(connection, request):
         return 410, {"error": "hold_gone", "detail": "hold is expired, unknown or already booked"}
     if len(request.passengers) != hold["passengers"]:
         raise ApiError(422, "passenger_mismatch", "passenger count differs from the hold")
-    if not request.payment_token.startswith("tok_ok_"):
+    if not request.payment_token.startswith(("tok_ok_", "tok_decline_")):
+        raise ApiError(422, "invalid_payment_token", "payment token is not tok_ok_* or tok_decline_*")
+    if request.payment_token.startswith("tok_decline_"):
         connection.execute("UPDATE holds SET consumed = true WHERE hold_id = %s", (hold["hold_id"],))
         return 402, {"error": "payment_declined", "detail": "payment token was declined"}
 

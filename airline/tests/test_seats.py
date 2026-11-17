@@ -123,6 +123,12 @@ def test_declined_payment_releases_hold(client, flight):
     assert book(client, "h_unknown", ["A"]).status_code == 410
 
 
+def test_unknown_payment_token_is_422_and_keeps_hold(client, flight):
+    h = hold(client, flight[0]).json()
+    assert book(client, h["hold_id"], ["A"], token="card_4242").status_code == 422
+    assert book(client, h["hold_id"], ["A"]).status_code == 201
+
+
 def test_cancel_returns_seats(client, flight):
     flight_id, capacity, _ = flight
     holds = [hold(client, flight_id, 1) for _ in range(capacity)]

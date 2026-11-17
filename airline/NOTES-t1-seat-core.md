@@ -13,3 +13,4 @@
 - `db.reset_seat_state(connection)` is for the admin worker's `POST /admin/reset`: it truncates holds, bookings and keys and zeroes `seats_sold`.
 - Broke: Dockerfile copied only `app.py db.py` and `.dockerignore` excluded the rest, so the container failed with `No module named 'errors'`. Fixed with `COPY *.py` and `!*.py`.
 - Test 3 needs `/admin/reset` and `/admin/flights`, which belong to another worker. I ran it with a throwaway admin module (not committed): 10/10 rounds.
+- Unknown payment tokens (neither `tok_ok_` nor `tok_decline_`) return 422 `invalid_payment_token` and keep the hold. The contract does not cover them; we treat them as a malformed request, not a declined card. Raising ApiError rolls back, so the idempotency key is not burned (user decision, 2026-11-17).
