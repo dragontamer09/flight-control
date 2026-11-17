@@ -133,3 +133,24 @@ volume survives `docker compose down` and a later `docker compose up`.
   A hold or booking updates both legs of an itinerary in one transaction, while reservations for unrelated flights can proceed
   concurrently. PostgreSQL adds a separate process and connection management.
   Compose handles startup and gives the database a persistent volume.
+
+## Shared API behavior
+
+Every request requires the configured bearer key, except `GET /ui`, the static
+front-end page. Errors use string `error` and `detail` fields, including
+validation errors (`422`), unknown routes (`404`), and unexpected failures
+(`500`). Unexpected failures are logged on the server; their details are not
+returned to clients. Every response includes
+`Server-Timing: app;dur=<milliseconds>`. There is no rate limiter.
+
+Body models use strict types so wrong JSON types are rejected rather than
+coerced (for example, `"2"` is not an integer). `RequestModel` in `app.py` is
+the strict base model; the endpoint models in `seats.py` use strict field types.
+Query parameters arrive as text and need their own validation. Responses use
+UTC timestamps ending in `Z`, dates in `YYYY-MM-DD` form, and integer cents for
+money.
+
+Run the shared API regression check from the repository root with
+`python -m pytest tests/test_airline_api.py` in an environment containing
+`airline/requirements.txt`, `httpx`, and `pytest`. It uses test-only routes and
+does not require PostgreSQL or catalog loading.

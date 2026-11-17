@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 import time
@@ -6,16 +7,22 @@ from contextlib import asynccontextmanager
 
 import psycopg
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict
 
 from admin import router as admin_router
 from db import load_catalog, pool
-from errors import install_error_handlers
+from errors import error_response, install_error_handlers
 from search import load_search_catalog, router as search_router
 from seats import router as seats_router
 
 AUTHORIZATION = f"Bearer {os.environ['AIRLINE_API_KEY']}".encode()
 BOOT_ID = str(uuid.uuid4())
+logger = logging.getLogger(__name__)
+
+
+class RequestModel(BaseModel):
+    model_config = ConfigDict(strict=True)
 
 
 @asynccontextmanager
@@ -39,9 +46,13 @@ async def authenticate(request: Request, call_next):
     started = time.perf_counter()
     authorization = request.headers.get("authorization", "").encode("latin-1")
     if (request.method == "GET" and request.url.path == "/ui") or secrets.compare_digest(authorization, AUTHORIZATION):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception("Unhandled request error")
+            response = error_response(500, "internal_server_error", "Internal server error")
     else:
-        response = JSONResponse({"error": "unauthorized", "detail": ""}, status_code=401)
+        response = error_response(401, "unauthorized", "A valid bearer API key is required")
     response.headers["Server-Timing"] = f"app;dur={(time.perf_counter() - started) * 1000:.1f}"
     return response
 
@@ -52,7 +63,7 @@ def health():
         with psycopg.connect() as connection:
             connection.execute("SELECT 1")
     except psycopg.OperationalError:
-        return JSONResponse({"error": "database_unavailable", "detail": ""}, status_code=503)
+        return error_response(503, "database_unavailable", "Database is unavailable")
     return {"status": "ok", "boot_id": BOOT_ID, "version": "0.1.0"}
 
 

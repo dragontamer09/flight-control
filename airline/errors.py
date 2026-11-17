@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -29,5 +31,8 @@ def install_error_handlers(app: FastAPI):
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException):
-        codes = {404: "not_found", 405: "method_not_allowed"}
-        return error_response(exc.status_code, codes.get(exc.status_code, "error"), str(exc.detail))
+        response = error_response(
+            exc.status_code, HTTPStatus(exc.status_code).name.lower(), str(exc.detail)
+        )
+        response.headers.update(exc.headers or {})
+        return response
