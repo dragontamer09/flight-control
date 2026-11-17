@@ -46,7 +46,8 @@ setting.
 ## Front end
 
 Open `http://localhost:8080/ui` in a browser. The page searches flights and
-makes reservations. It needs no API key.
+makes reservations. The page loads without a key. Enter the API key on the
+page; the browser stores it and sends it with each request.
 
 ## Run the Flight Control tests
 
@@ -129,7 +130,6 @@ volume survives `docker compose down` and a later `docker compose up`.
 - **Python 3.12 and FastAPI** use the same language and web framework as the
   grader. FastAPI gives us request validation and JSON responses for the API.
 - **PostgreSQL and Psycopg** give us database transactions and row-level locks.
-  A future hold or booking can update both legs of an itinerary in one
-  transaction, while reservations for unrelated flights can proceed
+  A hold or booking updates both legs of an itinerary in one transaction, while reservations for unrelated flights can proceed
   concurrently. PostgreSQL adds a separate process and connection management.
   Compose handles startup and gives the database a persistent volume.
