@@ -1,7 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Contract · Flight Control{% endblock %}
 {% block body %}
-<main class="narrow contract">
-  {{ body | safe }}
+<main class="contract">
+  <nav class="contract-index" aria-label="Contract shortcuts">
+    <p>On this page</p>
+    <ul>
+      <li><a href="#getting-started">Getting started</a></li>
+      <li><a href="#the-catalog">The catalog</a></li>
+      <li><a href="#endpoints">Endpoints</a></li>
+      <li><a href="#tests">Tests</a></li>
+      <li><a href="#running-the-tests-yourself">Run the tests yourself</a></li>
+    </ul>
+  </nav>
+  <article class="contract-body">
+    {{ body | replace('<table>', '<div class="table-wrap" tabindex="0"><table>') | replace('</table>', '</table></div>') | safe }}
+  </article>
 </main>
 {% endblock %}

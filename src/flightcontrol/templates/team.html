@@ -1,101 +1,115 @@
 {% extends "base.html" %}
 {% block title %}{{ team.name }} · Flight Control{% endblock %}
 {% block body %}
-<main class="narrow">
-  <h1>{{ team.name }}</h1>
-  <p class="lede">This page is private to your team. Anyone with the link can start runs for you, so do not post it.</p>
+<main class="narrow team-page">
+  <header class="team-heading">
+    <h1>{{ team.name }}</h1>
+    <p class="lede">Keep this team link private. Anyone with it can start runs for your team.</p>
+  </header>
   {% if msg %}<p class="msg">{{ msg }}</p>{% endif %}
   {% if err %}<p class="msg err">{{ err }}</p>{% endif %}
 
-  <section class="card">
-    <h2 style="margin-top:0">Connection</h2>
-    <form method="post" action="/t/{{ token }}/settings">
-      <div class="field">
-        <label for="url">Your airline's base URL</label>
-        <input id="url" type="url" name="url" value="{{ team.url }}" placeholder="https://your-team.trycloudflare.com">
-      </div>
-      <div class="field">
-        <label for="key">API key {% if key_mask %}(saved as <span class="mono">{{ key_mask }}</span>, leave blank to keep it){% endif %}</label>
-        <input id="key" type="password" name="api_key" autocomplete="off" placeholder="the key your server expects">
-      </div>
-      <button type="submit">Save</button>
-    </form>
-    <p class="small" style="margin-bottom:0">
-      {% if not team.url %}<span class="muted">No URL saved yet.</span>
-      {% elif pending %}<span class="warn">Your URL is waiting for approval.</span> Your instructor approves each new URL before Flight Control calls it.
-      {% else %}<span class="ok">Your URL is approved.</span>{% endif %}
-      {% if team.api_key %}<span class="ok">Your API key is saved.</span>{% else %}<span class="warn">No API key saved yet.</span>{% endif %}
-      Approval only means Flight Control is allowed to call this URL. The call log below shows whether your server actually answers.
-    </p>
+  <section class="card team-live" aria-labelledby="live-heading">
+    <h2 id="live-heading">Live test status</h2>
+    <p id="now">Checking what is running.</p>
   </section>
 
-  <section class="card" style="margin-top:16px">
-    <h2 style="margin-top:0">Practice runs</h2>
-    <p class="small muted" style="margin-top:0">These runs go through your tunnel and count only as practice. Your instructor runs the official tests.</p>
-    <div id="now" class="small muted" style="margin-bottom:12px">Checking what is running.</div>
-    <div class="buttons" style="margin-bottom:14px">
-      <form class="inline" method="post" action="/t/{{ token }}/steady">
-        <input type="hidden" name="on" value="{{ 0 if team.steady else 1 }}">
-        <button type="submit" class="{{ '' if team.steady else 'ghost' }}" {% if not ready %}disabled{% endif %}>
-          {{ "Stop test 1 (steady)" if team.steady else "Start test 1 (steady)" }}</button>
+  <div class="team-controls">
+    <section class="card" aria-labelledby="connection-heading">
+      <h2 id="connection-heading">Connection</h2>
+      <form method="post" action="/t/{{ token }}/settings">
+        <div class="field">
+          <label for="url">Your airline's base URL</label>
+          <input id="url" type="url" name="url" value="{{ team.url }}" placeholder="https://your-team.trycloudflare.com">
+        </div>
+        <div class="field">
+          <label for="key">API key</label>
+          {% if key_mask %}<p id="key-hint" class="small muted team-field-hint">Saved as <span class="mono">{{ key_mask }}</span>. Leave blank to keep it.</p>{% endif %}
+          <input id="key" type="password" name="api_key" autocomplete="off" placeholder="The key your server expects" {% if key_mask %}aria-describedby="key-hint"{% endif %}>
+        </div>
+        <button type="submit">Save connection</button>
       </form>
-    </div>
-    <p class="msg err small" style="margin:0 0 10px">Tests 2 to 5 reset your airline first. Every booking on it is deleted, so do not start one while you are demoing.</p>
-    <table class="small" style="margin-bottom:10px">
-      {% set what = {2: "Steps from 5 to 40 travelers per second. Checks speed and that nothing oversells.",
-                     3: "40 travelers race for the last 1 to 3 seats of a flight, 10 times.",
-                     4: "Calls your restart endpoint mid-traffic and checks every booking survived.",
-                     5: "Mixed traffic, then checks your stats and bookings match Flight Control's record exactly."} %}
-      {% for t in [2, 3, 4, 5] %}
-      <tr>
-        <td style="width:170px">
+      <div class="team-connection-status">
+        <ul class="team-badges" aria-label="Connection status">
+          {% if not team.url %}<li class="pill">No URL saved</li>
+          {% elif pending %}<li class="pill warn">URL awaiting approval</li>
+          {% else %}<li class="pill ok">URL approved</li>{% endif %}
+          {% if team.api_key %}<li class="pill ok">API key saved</li>{% else %}<li class="pill warn">No API key saved</li>{% endif %}
+        </ul>
+        {% if pending %}<p class="small muted">Your instructor must approve each new URL before Flight Control calls it.</p>
+        {% elif team.url %}<p class="small muted">Check the call log below to see if your server answers.</p>{% endif %}
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="practice-heading">
+      <h2 id="practice-heading">Practice runs</h2>
+      <p class="small muted team-intro">Practice runs go through your tunnel. Your instructor runs the official tests.</p>
+      <div class="buttons team-steady">
+        <form class="inline" method="post" action="/t/{{ token }}/steady">
+          <input type="hidden" name="on" value="{{ 0 if team.steady else 1 }}">
+          <button type="submit" class="{{ '' if team.steady else 'ghost' }}" {% if not ready %}disabled{% endif %}>
+            {{ "Stop test 1 (steady)" if team.steady else "Start test 1 (steady)" }}</button>
+        </form>
+      </div>
+      <p class="msg err small">Tests 2–5 reset your airline and delete every booking. Wait until your demo is over to start one.</p>
+      <ul class="team-tests">
+        {% set what = {2: "Steps from 5 to 40 travelers per second. Checks speed and that nothing oversells.",
+                       3: "40 travelers race for the last 1 to 3 seats of a flight, 10 times.",
+                       4: "Calls your restart endpoint mid-traffic and checks every booking survived.",
+                       5: "Mixed traffic, then checks your stats and bookings match Flight Control's record exactly."} %}
+        {% for t in [2, 3, 4, 5] %}
+        <li>
           <form class="inline" method="post" action="/t/{{ token }}/run">
             <input type="hidden" name="test" value="{{ t }}">
             <button type="submit" class="ghost" {% if not ready or active or practice_left == 0 %}disabled{% endif %}>Test {{ t }} {{ TEST_NAMES[t] }}</button>
           </form>
-        </td>
-        <td class="muted">{{ what[t] }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-    <p class="small muted" style="margin-bottom:0">
-      {% if not ready %}The buttons start working once your URL is approved and your API key is saved.
-      {% elif active %}A run is already queued or running. The buttons come back when it finishes.
-      {% elif practice_left == 0 %}You have used today's runs. Each one comes back 24 hours after it was queued.
-      {% else %}{{ practice_left }} runs left in the last 24 hours.{% endif %}
-      The full rules for every test are in the <a href="/#tests">contract</a>. You can run the same tests on your own machine at any time.
-    </p>
+          <p class="small muted">{{ what[t] }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="small muted team-practice-note">
+        {% if not ready %}You can start a test once your URL is approved and your API key is saved.
+        {% elif active %}A run is queued or running. You can start another when it finishes.
+        {% elif practice_left == 0 %}You have used today's runs. Each one comes back 24 hours after it was queued.
+        {% else %}<strong class="team-count">{{ practice_left }}</strong> practice run{{ 's' if practice_left != 1 else '' }} available in your rolling 24-hour window.{% endif %}
+      </p>
+      <p class="small muted team-practice-note">See the <a href="/#tests">test rules</a> for details. You can run the same tests on your own machine at any time.</p>
+    </section>
+  </div>
+
+  <section class="team-log" aria-labelledby="calls-heading">
+    <h2 id="calls-heading">Calls to your airline</h2>
+    <p class="small muted team-intro">Newest calls first. A status of <code>connect</code> or <code>timeout</code> means your server did not answer.</p>
+    <div class="card table-wrap" role="region" aria-labelledby="calls-heading" tabindex="0">
+      <table class="small team-calls">
+        <thead><tr><th scope="col">Time</th><th scope="col">Call</th><th scope="col" class="num">Status</th><th scope="col" class="num">ms</th></tr></thead>
+        <tbody id="calls"><tr><td colspan="4" class="empty">No calls yet. Start test 1 to see them.</td></tr></tbody>
+      </table>
+    </div>
   </section>
 
-  <h2>Calls to your airline</h2>
-  <p class="small muted">The last calls Flight Control made to your server, newest first. A status of connect or timeout means your server did not answer.</p>
-  <div class="card table-wrap">
-    <table class="small">
-      <thead><tr><th>Time</th><th>Call</th><th class="num">Status</th><th class="num">ms</th></tr></thead>
-      <tbody id="calls"><tr><td colspan="4" class="empty">No calls yet. Start test 1 to see them.</td></tr></tbody>
-    </table>
-  </div>
-
-  <h2>Your runs</h2>
-  <div class="card table-wrap">
-    <table>
-      <thead><tr><th>Run</th><th>Test</th><th>Status</th><th class="num">Score</th><th>Result</th><th>When</th></tr></thead>
-      <tbody>
-      {% for r in runs %}
-        <tr>
-          <td><a href="/t/{{ token }}/runs/{{ r.id }}">#{{ r.id }}</a>{% if r.official %} <span class="pill">official</span>{% endif %}</td>
-          <td>{{ r.test }} {{ TEST_NAMES[r.test] }}</td>
-          <td>{{ r.status }}</td>
-          <td class="num">{% if r.score is not none %}{{ "%.2f"|format(r.score) }}{% endif %}</td>
-          <td class="small">{% if r.gates_ok == 0 %}<span class="no">rule broken.</span> {% endif %}{{ r.summary }}</td>
-          <td class="small muted">{{ r.created | ago }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="6" class="empty">No runs yet.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <section class="team-log" aria-labelledby="runs-heading">
+    <h2 id="runs-heading">Your runs</h2>
+    <div class="card table-wrap" role="region" aria-labelledby="runs-heading" tabindex="0">
+      <table class="team-runs">
+        <thead><tr><th scope="col">Run</th><th scope="col">Test</th><th scope="col">Status</th><th scope="col" class="num">Score</th><th scope="col">Result</th><th scope="col">When</th></tr></thead>
+        <tbody>
+        {% for r in runs %}
+          <tr>
+            <td><a class="mono" href="/t/{{ token }}/runs/{{ r.id }}">#{{ r.id }}</a>{% if r.official %} <span class="pill">Official</span>{% endif %}</td>
+            <td>{{ r.test }} {{ TEST_NAMES[r.test] }}</td>
+            <td><span class="pill{% if r.status == 'done' and r.gates_ok != 0 %} ok{% elif r.status in ['queued', 'running'] %} warn{% elif r.status in ['failed', 'void'] %} no{% endif %}">{{ r.status | capitalize }}</span></td>
+            <td class="num">{% if r.score is not none %}{{ "%.2f"|format(r.score) }}{% endif %}</td>
+            <td class="small">{% if r.gates_ok == 0 %}<strong class="no">Rule broken.</strong> {% endif %}{{ r.summary }}</td>
+            <td class="small muted">{{ r.created | ago }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="empty">No runs yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </main>
 <script>
 (function () {

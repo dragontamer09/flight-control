@@ -6,21 +6,27 @@
 <title>{% block title %}Flight Control{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=3">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='9' fill='%23c76a00'/></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=4">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='5' fill='%23172e40'/><path d='M9 5h14v22H9zM16 9v3m0 2v4m0 2v3' fill='none' stroke='%23ffba70' stroke-width='2'/></svg>">
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><span class="dot"></span>Flight Control</a>
-  <nav>
-    <a href="/" class="{{ 'on' if nav == 'contract' }}"{% if nav == 'contract' %} aria-current="page"{% endif %}>Contract</a>
-    <a href="https://github.com/enochlev/flight-control">Code on GitHub</a>
-  </nav>
-  <span class="spacer"></span>
-  <span class="course">COMP 4340/6340 at NNU</span>
+  <div class="top-inner">
+    <a class="brand" href="/"><span class="runway" aria-hidden="true"></span>Flight Control</a>
+    <nav aria-label="Main">
+      <a href="/"{% if nav == 'contract' %} aria-current="page"{% endif %}>Contract</a>
+      <a href="https://github.com/enochlev/flight-control">Code on GitHub</a>
+    </nav>
+    <span class="course">COMP 4340/6340 at NNU</span>
+  </div>
 </header>
 {% block body %}{% endblock %}
-<footer>Flight Control sends simulated travelers to each team's airline and checks every answer. Catalog {{ cat.year }}, {{ "{:,}".format(cat.count) }} flights, sha256 {{ cat.sha256[:12] }}.</footer>
+<footer class="footer">
+  <div class="footer-inner">
+    <p>Flight Control sends simulated travelers to each team's airline and checks every answer.</p>
+    <p>Catalog {{ cat.year }} · {{ "{:,}".format(cat.count) }} flights<br>SHA-256 <span class="mono">{{ cat.sha256[:12] }}</span></p>
+  </div>
+</footer>
 </body>
 </html>
