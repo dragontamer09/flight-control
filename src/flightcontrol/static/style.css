@@ -528,6 +528,103 @@ button:disabled {
 
 /* === page: team === */
 
+.team-page .team-heading {
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.team-page .team-live {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px 18px;
+  margin-bottom: 16px;
+  border-inline-start: 4px solid var(--accent);
+  background: var(--panel-2);
+}
+
+.team-page .card h2 { margin: 0 0 10px; }
+
+.team-page .team-live h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.team-page #now {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.team-page .team-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.team-page .team-field-hint { margin: 0 0 6px; }
+
+.team-page .team-connection-status {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.team-page .team-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-page .team-connection-status p,
+.team-page .team-practice-note { margin: 10px 0 0; }
+
+.team-page .team-intro { margin: 0 0 12px; }
+.team-page .team-steady { margin-bottom: 14px; }
+
+.team-page .team-tests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-page .team-tests li {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.team-page .team-tests p { margin: 0; }
+.team-page .team-count { color: var(--ink); }
+
+.team-page :is(.team-count, .team-log td:first-child) {
+  font-variant-numeric: tabular-nums;
+}
+
+.team-page .team-calls { min-width: 24rem; }
+.team-page .team-runs { min-width: 36rem; }
+
+.team-page :is(.team-calls, .team-runs) td { vertical-align: middle; }
+
+.team-page :is(.team-calls td:first-child, .team-runs th, .team-runs td:not(:nth-child(5))) {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .team-page :is(.team-live, .team-controls) { grid-template-columns: minmax(0, 1fr); }
+  .team-page button { min-height: 44px; }
+}
+
+@media (max-width: 440px) {
+  .team-page .team-tests li { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* === page: report === */
 
 /* === page: admin === */
