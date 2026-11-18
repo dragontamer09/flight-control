@@ -2,46 +2,54 @@
 {% block title %}Run {{ run.id }} · Flight Control{% endblock %}
 {% block body %}
 {% set r = run.result %}
-<main class="narrow">
-  <p class="small"><a href="{{ back }}">Back</a></p>
-  <h1>Run {{ run.id }}, test {{ run.test }} {{ TEST_NAMES[run.test] }}</h1>
-  <p class="lede">{{ team.name }}{% if run.official %}, official run{% endif %}. {{ run.status }} {{ run.finished | ago }}.</p>
+<main class="narrow report">
+  <a class="report-back" href="{{ back }}">Back</a>
+  <header class="report-header">
+    <p class="report-run small"><span class="mono">Run {{ run.id }} / Test {{ run.test }}</span>{% if run.official %}<span class="pill">Official run</span>{% endif %}</p>
+    <h1>{{ TEST_NAMES[run.test] }}</h1>
+    <p class="report-meta">
+      <span>{{ team.name }}</span>
+      <span class="pill {{ 'ok' if run.status == 'done' else 'warn' if run.status in ('queued', 'running') else 'no' }}">{{ run.status | capitalize }}</span>
+      {% if run.finished %}<span class="small muted">{{ run.finished | ago }}</span>{% endif %}
+    </p>
+  </header>
 
-  <section class="card">
-    <div class="stats">
-      <div><div class="label">Score</div><div class="stat">{% if run.score is not none %}{{ "%.2f"|format(run.score) }}{% else %}-{% endif %}</div></div>
-      <div><div class="label">Rules</div><div class="stat {{ 'ok' if run.gates_ok else 'no' }}">{{ "kept" if run.gates_ok else "broken" if run.gates_ok == 0 else "-" }}</div></div>
-      <div><div class="label">Travelers</div><div class="stat">{{ r.travelers or 0 }}</div></div>
-      <div><div class="label">Correct</div><div class="stat">{{ r.travelers_ok or 0 }}</div></div>
+  <section class="card report-overview" aria-label="Run summary">
+    <dl class="stats report-stats">
+      <div><dt class="label">Score</dt><dd class="stat">{% if run.score is not none %}{{ "%.2f"|format(run.score) }}{% else %}—{% endif %}</dd></div>
+      <div><dt class="label">Rules</dt><dd><span class="pill {{ 'ok' if run.gates_ok else 'no' if run.gates_ok == 0 else '' }}">{{ "Kept" if run.gates_ok else "Broken" if run.gates_ok == 0 else "Pending" }}</span></dd></div>
+      <div><dt class="label">Travelers</dt><dd class="stat">{{ r.travelers or 0 }}</dd></div>
+      <div><dt class="label">Correct</dt><dd class="stat">{{ r.travelers_ok or 0 }}</dd></div>
+    </dl>
+    <div class="report-summary">
+      {% if run.summary %}<p>{{ run.summary }}</p>{% endif %}
+      {% if r.gates %}<ul class="msg err no">{% for g in r.gates %}<li>{{ g }}</li>{% endfor %}</ul>{% endif %}
+      <p class="small muted">Scores run from 0 to 1. A traveler is correct when every call got an answer, no rule was broken and the whole trip took under 5 seconds.</p>
     </div>
-    <p style="margin-bottom:0">{{ run.summary }}</p>
-    {% if r.gates %}<ul class="no">{% for g in r.gates %}<li>{{ g }}</li>{% endfor %}</ul>{% endif %}
-    <p class="small muted" style="margin-bottom:0">Scores run from 0 to 1. A traveler is correct when every call got an answer, no rule was broken and the whole trip took under 5 seconds.</p>
   </section>
-
   {% if r.failed_because %}
-  <h2>Why travelers failed</h2>
-  <div class="card table-wrap"><table>
+  <h2 id="report-table-why-travelers-failed">Why travelers failed</h2>
+  <div class="card table-wrap" role="region" aria-labelledby="report-table-why-travelers-failed" tabindex="0"><table class="report-table-compact">
     <thead><tr><th>Reason</th><th class="num">Travelers</th></tr></thead>
     <tbody>{% for k, n in r.failed_because.items() %}<tr><td>{{ k }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</tbody>
   </table></div>
   {% endif %}
 
   {% if r.steps %}
-  <h2>Steps</h2>
-  <div class="card table-wrap"><table>
+  <h2 id="report-table-steps">Steps</h2>
+  <div class="card table-wrap" role="region" aria-labelledby="report-table-steps" tabindex="0"><table>
     <thead><tr><th class="num">Travelers per second</th><th class="num">Travelers</th><th class="num">Correct</th><th class="num">p95 server ms per traveler, calls added up</th><th>Passed</th></tr></thead>
-    <tbody>{% for s in r.steps %}<tr><td class="num">{{ s.rate }}</td><td class="num">{{ s.travelers }}</td><td class="num">{{ s.correct | pct }}</td><td class="num">{{ s.p95_server_ms }}</td><td class="{{ 'ok' if s.passed else 'no' }}">{{ "yes" if s.passed else "no" }}</td></tr>{% endfor %}</tbody>
+    <tbody>{% for s in r.steps %}<tr><td class="num">{{ s.rate }}</td><td class="num">{{ s.travelers }}</td><td class="num">{{ s.correct | pct }}</td><td class="num">{{ s.p95_server_ms }}</td><td><span class="pill {{ 'ok' if s.passed else 'no' }}">{{ "Yes" if s.passed else "No" }}</span></td></tr>{% endfor %}</tbody>
   </table></div>
   {% endif %}
 
   {% if r.rounds %}
-  <h2>Rounds</h2>
-  <div class="card table-wrap"><table>
+  <h2 id="report-table-rounds">Rounds</h2>
+  <div class="card table-wrap" role="region" aria-labelledby="report-table-rounds" tabindex="0"><table>
     <thead><tr><th>Flight</th><th class="num">Seats left</th><th class="num">Booked</th><th>Outcomes</th><th>Passed</th></tr></thead>
     <tbody>{% for x in r.rounds %}<tr><td class="mono small">{{ x.flight }}</td><td class="num">{{ x.left }}</td><td class="num">{{ x.booked }}</td>
       <td class="small mono">{% for k, v in (x.outcomes or {}).items() %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
-      <td class="{{ 'ok' if x.passed else 'no' }}">{{ "yes" if x.passed else x.why }}</td></tr>{% endfor %}</tbody>
+      <td><span class="pill {{ 'ok' if x.passed else 'no' }}">{{ "Yes" if x.passed else x.why or "No" }}</span></td></tr>{% endfor %}</tbody>
   </table></div>
   {% endif %}
 
@@ -66,16 +74,16 @@
   {% endif %}
 
   {% if r.violations %}
-  <h2>Rules broken during the run</h2>
-  <div class="card table-wrap"><table>
+  <h2 id="report-table-rules-broken-during-the-run">Rules broken during the run</h2>
+  <div class="card table-wrap" role="region" aria-labelledby="report-table-rules-broken-during-the-run" tabindex="0"><table>
     <thead><tr><th>Problem</th><th class="num">Count</th><th>Examples</th></tr></thead>
     <tbody>{% for k, v in r.violations.items() %}<tr><td>{{ k }}</td><td class="num">{{ v.count }}</td><td class="mono small">{% for e in v.examples %}{{ e }}<br>{% endfor %}</td></tr>{% endfor %}</tbody>
   </table></div>
   {% endif %}
 
   {% if r.ops %}
-  <h2>Per endpoint</h2>
-  <div class="card table-wrap"><table>
+  <h2 id="report-table-per-endpoint">Per endpoint</h2>
+  <div class="card table-wrap" role="region" aria-labelledby="report-table-per-endpoint" tabindex="0"><table>
     <thead><tr><th>Call</th><th class="num">Count</th><th class="num">p95 round trip ms per call</th><th class="num">p95 server ms per call</th><th>Status codes</th></tr></thead>
     <tbody>{% for op, s in r.ops.items() %}<tr><td>{{ op }}</td><td class="num">{{ s.n }}</td><td class="num">{{ s.p95_rtt_ms }}</td><td class="num">{{ s.p95_server_ms }}</td>
       <td class="mono small">{% for c, n in s.codes.items() %}{{ c }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
