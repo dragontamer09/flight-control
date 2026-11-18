@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flight reservations</title>
+<style>
+:root { color-scheme: light; font-family: Arial, sans-serif; color: #172332; background: #f3f6f8; }
+* { box-sizing: border-box; }
+body { margin: 0; } header { background: #183d5b; color: white; padding: 20px max(20px, calc((100% - 1000px)/2)); }
+h1 { font-size: 24px; margin: 0; } h2 { font-size: 20px; margin: 0 0 16px; } h3 { font-size: 16px; margin: 0 0 8px; }
+main { max-width: 1040px; margin: auto; padding: 24px 20px 48px; } section { background: white; border: 1px solid #cbd5dd; padding: 20px; margin-bottom: 16px; border-radius: 4px; }
+form, .fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; } label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; } input { font: inherit; padding: 9px; border: 1px solid #8799a8; border-radius: 3px; width: 160px; } input[type=password], input[name=booking_id], input[name=payment_token] { width: 260px; max-width: 100%; }
+button { font: inherit; font-weight: 600; color: white; background: #145c87; border: 1px solid #145c87; border-radius: 3px; padding: 9px 15px; cursor: pointer; } button:hover { background: #10486a; } button:focus-visible, input:focus-visible { outline: 3px solid #dc9700; outline-offset: 2px; } button:disabled { opacity: .55; cursor: default; }
+p { line-height: 1.5; } .hint { color: #516272; font-size: 14px; } .result { border-top: 1px solid #d8e0e6; padding: 16px 0; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap; } .result p { margin: 4px 0; } .message { padding: 12px; margin: 12px 0; background: #e8f2f7; border-left: 4px solid #145c87; white-space: pre-wrap; overflow-wrap: anywhere; } .error { background: #fff0ee; border-color: #aa3326; color: #782016; } [hidden] { display: none !important; } #passenger-fields { display: flex; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header><h1>Flight reservations</h1></header>
+<main>
+<section><h2>API access</h2><label>API key <input id="api-key" type="password" value="local-airline-key" autocomplete="off"></label><p class="hint">The key is saved in this browser and sent with each request.</p></section>
+<section><h2>Search flights</h2><form id="search-form"><label>Origin <input name="origin" value="BOI" maxlength="3" required></label><label>Destination <input name="destination" value="JFK" maxlength="3" required></label><label>Departure date <input name="date" type="date" required></label><label>Passengers <input name="passengers" type="number" min="1" max="9" value="1" required></label><button>Search</button></form><div id="search-message" role="status"></div><div id="results"></div></section>
+<section id="hold-section" hidden><h2>Complete your booking</h2><div id="hold-details"></div><form id="booking-form"><div id="passenger-fields"></div><label>Payment token <input name="payment_token" required></label><button>Book flight</button></form><div id="booking-message" role="status"></div></section>
+<section><h2>Find or cancel a booking</h2><form id="lookup-form"><label>Booking ID <input name="booking_id" required></label><button>Find booking</button><button id="cancel-button" type="button">Cancel booking</button></form><div id="lookup-message" role="status"></div></section>
+</main>
+<script>
+const $ = selector => document.querySelector(selector);
+const keyInput = $('#api-key');
+try { keyInput.value = localStorage.getItem('airline-api-key') || keyInput.value; } catch (_) {}
+keyInput.addEventListener('input', () => { try { localStorage.setItem('airline-api-key', keyInput.value); } catch (_) {} });
+const random = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD'}).format(cents / 100);
+function message(element, text, error = false) { element.textContent = text; element.className = text ? `message${error ? ' error' : ''}` : ''; }
+async function api(path, options = {}) {
+  const response = await fetch(path, {...options, headers: {'Authorization': `Bearer ${keyInput.value}`, ...(options.body ? {'Content-Type': 'application/json'} : {})}});
+  let data; try { data = await response.json(); } catch (_) { throw new Error(`Request failed (${response.status})`); }
+  if (!response.ok) throw new Error([data.error, data.detail].filter(Boolean).join(': ') || `Request failed (${response.status})`);
+  return data;
+}
+let activeHold = null, bookingKey = null, bookingPayload = null;
+const searchForm = $('#search-form'), bookingForm = $('#booking-form'), lookupForm = $('#lookup-form');
+searchForm.addEventListener('submit', async event => {
+  event.preventDefault(); const params = new URLSearchParams(new FormData(searchForm));
+  params.set('origin', params.get('origin').trim().toUpperCase()); params.set('destination', params.get('destination').trim().toUpperCase());
+  const results = $('#results'); results.replaceChildren(); message($('#search-message'), 'Searching...');
+  try {
+    const data = await api(`/search?${params}`); message($('#search-message'), data.itineraries.length ? `${data.itineraries.length} itineraries found.` : 'No flights found for this search.');
+    for (const itinerary of data.itineraries) {
+      const row = document.createElement('div'); row.className = 'result';
+      const details = document.createElement('div');
+      const title = document.createElement('h3'); title.textContent = itinerary.flight_ids.join(' + '); details.append(title);
+      const times = document.createElement('p'); times.textContent = `Departure: ${itinerary.departure} | Arrival: ${itinerary.arrival}`; details.append(times);
+      const fare = document.createElement('p'); fare.textContent = `${itinerary.stops} stop(s) | ${money(itinerary.price_cents)} per passenger | ${itinerary.seats_available} seats available`; details.append(fare);
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Hold itinerary';
+      button.addEventListener('click', async () => {
+        button.disabled = true; message($('#search-message'), 'Holding itinerary...');
+        try {
+          activeHold = await api('/holds', {method:'POST', body: JSON.stringify({itinerary_id: itinerary.itinerary_id, passengers: Number(params.get('passengers'))})});
+          bookingKey = random(); bookingPayload = null; $('#hold-section').hidden = false;
+          $('#hold-details').textContent = `Hold ${activeHold.hold_id} for ${activeHold.itinerary_id}. Total ${money(activeHold.total_cents)}. Expires ${activeHold.expires_at}.`;
+          const fields = $('#passenger-fields'); fields.replaceChildren();
+          for (let i = 0; i < activeHold.passengers; i++) { const label = document.createElement('label'); label.textContent = `Passenger ${i + 1} name`; const input = document.createElement('input'); input.required = true; input.name = 'passenger'; label.append(input); fields.append(label); }
+          bookingForm.elements.payment_token.value = `tok_ok_${random()}`; message($('#booking-message'), ''); message($('#search-message'), 'Itinerary held. Complete the booking before it expires.');
+        } catch (error) { message($('#search-message'), error.message, true); } finally { button.disabled = false; }
+      }); row.append(details, button); results.append(row);
+    }
+  } catch (error) { message($('#search-message'), error.message, true); }
+});
+bookingForm.addEventListener('submit', async event => {
+  event.preventDefault(); if (!activeHold) return;
+  const payload = {hold_id: activeHold.hold_id, passengers: [...bookingForm.querySelectorAll('[name=passenger]')].map(input => ({name: input.value.trim()})), payment_token: bookingForm.elements.payment_token.value};
+  if (payload.passengers.some(passenger => !passenger.name)) { message($('#booking-message'), 'Enter a name for each passenger.', true); return; }
+  const signature = JSON.stringify(payload); if (bookingPayload && bookingPayload !== signature) bookingKey = random(); bookingPayload = signature;
+  message($('#booking-message'), 'Booking...');
+  try { const booking = await api('/bookings', {method:'POST', body: JSON.stringify({...payload, idempotency_key: bookingKey})}); message($('#booking-message'), `Booking confirmed: ${booking.booking_id}. Total ${money(booking.total_cents)}.`); lookupForm.elements.booking_id.value = booking.booking_id; }
+  catch (error) { message($('#booking-message'), error.message, true); }
+});
+function showBooking(booking) { message($('#lookup-message'), `Booking ${booking.booking_id}: ${booking.status}\nItinerary: ${booking.itinerary_id}\nPassengers: ${booking.passengers.map(p => p.name).join(', ')}\nTotal: ${money(booking.total_cents)}`); }
+lookupForm.addEventListener('submit', async event => { event.preventDefault(); try { showBooking(await api(`/bookings/${encodeURIComponent(lookupForm.elements.booking_id.value.trim())}`)); } catch (error) { message($('#lookup-message'), error.message, true); } });
+$('#cancel-button').addEventListener('click', async () => { if (!lookupForm.reportValidity()) return; try { showBooking(await api(`/bookings/${encodeURIComponent(lookupForm.elements.booking_id.value.trim())}`, {method:'DELETE'})); } catch (error) { message($('#lookup-message'), error.message, true); } });
+</script>
+</body>
+</html>

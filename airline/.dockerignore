@@ -2,5 +2,9 @@
 !Dockerfile
 !app.py
 !db.py
+!*.py
 !catalog
 !requirements.txt
+
+!static
+!static/**
